@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -29,15 +30,20 @@ public static class Program
 
         var factory = host.Services.GetRequiredService<IGrainFactory>();
 
-        var grain = factory.GetGrain<IReproGrain<Dummy>>(222);
-        await grain.SetValue("generic-interface");
-        await grain.GetValue();
-        await grain.GetValue();
+        IReproGrain<Dummy> genericRef = factory.GetGrain<IReproGrain<Dummy>>(0);
+        IReproGrain<Dummy> concreteRef = factory.GetGrain<IReproGrainDummy>(0);
 
-        grain = factory.GetGrain<IReproGrainDummy>(111);
-        await grain.SetValue("concrete");
-        await grain.GetValue();
-        await grain.GetValue();
+        await genericRef.SetValue("42");
+        Debug.Assert("42" == await genericRef.GetValue());
+        Debug.Assert("42" == await concreteRef.GetValue());
+
+        await genericRef.Deactivate();
+        Debug.Assert("42" == await genericRef.GetValue());
+        Debug.Assert("42" == await concreteRef.GetValue());
+
+        await genericRef.Deactivate();
+        Debug.Assert("42" == await concreteRef.GetValue()); // activating through non-generic grain ref fails to load state because Grain.GrainReference is different
+        Debug.Assert("42" == await genericRef.GetValue());
 
         await Task.Run(Console.ReadLine);
 
@@ -47,8 +53,9 @@ public static class Program
 
 public interface IReproGrain<T>:IGrainWithIntegerKey
 {
-    Task SetValue(string value, bool deactivate = false);
+    Task SetValue(string value);
     Task<string> GetValue();
+    Task Deactivate();
 }
 
 public interface IReproGrainDummy:IReproGrain<Dummy> { }
@@ -65,7 +72,13 @@ public class ReproGrain:Grain<ReproState>, IReproGrainDummy
     private readonly ILogger logger;
     public ReproGrain(ILogger<ReproGrain> logger) => this.logger = logger;
 
-    public Task SetValue(string value, bool deactivate)
+    public override Task OnActivateAsync()
+    {
+        logger.LogWarning($"OnActivateAsync {GrainReference}");
+        return base.OnActivateAsync();
+    }
+
+    public Task SetValue(string value)
     {
         logger.LogWarning($"SetValue='{value}' {GrainReference}");
         State.Value = value;
@@ -76,7 +89,13 @@ public class ReproGrain:Grain<ReproState>, IReproGrainDummy
     {
         var value = State.Value;
         logger.LogWarning($"GetValue='{value}' {GrainReference}");
-        DeactivateOnIdle();
         return Task.FromResult(value);
+    }
+
+    public Task Deactivate()
+    {
+        logger.LogWarning($"Deactivate {GrainReference}");
+        DeactivateOnIdle();
+        return Task.CompletedTask;
     }
 }
