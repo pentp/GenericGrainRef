@@ -74,13 +74,13 @@ public class ReproGrain:Grain<ReproState>, IReproGrainDummy
 
     public override Task OnActivateAsync()
     {
-        logger.LogWarning($"OnActivateAsync {GrainReference}");
+        logger.LogWarning($"OnActivateAsync {GrainReference} Identity={IdentityString}");
         return base.OnActivateAsync();
     }
 
     public Task SetValue(string value)
     {
-        logger.LogWarning($"SetValue='{value}' {GrainReference}");
+        logger.LogWarning($"SetValue='{value}' {GrainReference} Identity={IdentityString}");
         State.Value = value;
         return WriteStateAsync();
     }
@@ -88,13 +88,13 @@ public class ReproGrain:Grain<ReproState>, IReproGrainDummy
     public Task<string> GetValue()
     {
         var value = State.Value;
-        logger.LogWarning($"GetValue='{value}' {GrainReference}");
+        logger.LogWarning($"GetValue='{value}' {GrainReference} Identity={IdentityString}");
         return Task.FromResult(value);
     }
 
     public Task Deactivate()
     {
-        logger.LogWarning($"Deactivate {GrainReference}");
+        logger.LogWarning($"Deactivate {GrainReference} Identity={IdentityString}");
         DeactivateOnIdle();
         return Task.CompletedTask;
     }
